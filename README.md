@@ -1,5 +1,7 @@
 # VS3R: Robust Full-frame Video Stabilization via Deep 3D Reconstruction
 
+The weights for DVDM and LoRA will be released upon paper acceptance.
+
 ![overview](fig/pipeline.png)
 
 Code for the paper **VS3R: Robust Full-frame Video Stabilization via Deep 3D Reconstruction**.
