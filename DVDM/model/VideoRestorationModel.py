@@ -47,11 +47,6 @@ class VideoRestorationSystem(nn.Module):
 
     @property
     def device(self):
-        """
-        动态获取设备。
-        优先取 transformer，如果 transformer 被卸载（如预处理时），
-        则尝试取 text_encoder 或 vae 的设备。
-        """
         if self.offload_model and torch.cuda.is_available():
             return torch.device("cuda")
         if hasattr(self, 'transformer') and self.transformer is not None:
