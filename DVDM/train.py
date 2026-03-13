@@ -31,7 +31,6 @@ def sample_wan_timesteps(n, device, shift=3.0):
     
     return timesteps.clamp(min=0.001, max=1000.0)
 
-                                                
 class WanLatentDataset(Dataset):
     def __init__(self, data_dir):
         self.gt_dir = os.path.join(data_dir, "gt")
@@ -62,23 +61,22 @@ class WanLatentDataset(Dataset):
             "latents": gt_latent,
             "condition_latents": cond_latent,
             "prompt_embeds": prompt_embeds,
-            "filename": filename                                   
+            "filename": filename
         }
 
 def collate_fn(batch):
     latents = torch.stack([item["latents"] for item in batch])
     condition_latents = torch.stack([item["condition_latents"] for item in batch])
     prompt_embeds = torch.stack([item["prompt_embeds"] for item in batch])
-    filenames = [item["filename"] for item in batch]                                        
-    
+    filenames = [item["filename"] for item in batch]
+
     return {
-        "latents": latents, 
-        "condition_latents": condition_latents, 
+        "latents": latents,
+        "condition_latents": condition_latents,
         "prompt_embeds": prompt_embeds,
-        "filenames": filenames                                       
+        "filenames": filenames
     }
 
-                            
 def main():
     parser = argparse.ArgumentParser(description="Wan 2.2 I2V LoRA Training")
     parser.add_argument("--ckpt_dir", type=str, required=True, help="Wan 2.2 Diffusers 模型路径")
@@ -188,8 +186,8 @@ def main():
             latents = batch["latents"]
             condition = batch["condition_latents"] 
             prompt_embeds = batch["prompt_embeds"]
-            filenames = batch["filenames"]                                                      
-            
+            filenames = batch["filenames"]
+
             with accelerator.accumulate(model):
                 optimizer.zero_grad(set_to_none=True)
                 
@@ -225,13 +223,9 @@ def main():
                 pred_velocity_f32 = pred_velocity.to(torch.float32)
                 target_f32 = target.to(torch.float32)
                 loss = F.mse_loss(pred_velocity_f32, target_f32)
-                
-                                                                                 
-                                                                              
+
                 current_loss = loss.item()
                 if current_loss > 0.5:
-                                                                         
-                                                                                             
                     print(f"🚨 [High Loss] Step: {global_step} | Rank: {accelerator.process_index} | Loss: {current_loss:.4f} | File: {filenames}")
 
                 if torch.isnan(loss) or torch.isinf(loss):

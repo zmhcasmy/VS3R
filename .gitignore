@@ -13,6 +13,7 @@
 !*.js
 !*.ts
 !*.sh
-
+!*.png
+!*.jpg
 # 4. 必须不忽略 .gitignore 本身
 !.gitignore

@@ -1,4 +1,3 @@
-                                                                        
 import os
 import logging
 import torch
@@ -26,11 +25,6 @@ except ImportError:
     logging.warning("peft library not found. LoRA training will not be available.")
 
 class VideoRestorationSystem(nn.Module):
-    """
-    A system for Video Restoration using Wan2.2 components.
-    修正了 VAE Latent 的归一化逻辑 (Channel-wise Mean/Std)，适配 Wan2.2 架构。
-    适配 Accelerate 分布式训练 (移除硬编码 device)。
-    """
     def __init__(
         self,
         pretrained_model_path: str,
@@ -250,61 +244,40 @@ class VideoRestorationSystem(nn.Module):
     ):
         """
         Forward pass for prediction using Dense Conditioning.
-        """
-                                 
+        """                     
         current_device = noisy_latents.device
         current_dtype = noisy_latents.dtype
 
         B = noisy_latents.shape[0]
-        _, _, F_lat, H_lat, W_lat = condition_latents_visual.shape
-        
-                                                
-        mask = torch.ones((B, 4, F_lat, H_lat, W_lat), device=current_device, dtype=current_dtype)
-        
-                      
-        condition_latents = torch.cat([mask, condition_latents_visual], dim=1)
-        
-              
+        _, _, F_lat, H_lat, W_lat = condition_latents_visual.shape                                
+        mask = torch.ones((B, 4, F_lat, H_lat, W_lat), device=current_device, dtype=current_dtype)             
+        condition_latents = torch.cat([mask, condition_latents_visual], dim=1) 
         latent_model_input = torch.cat([noisy_latents, condition_latents], dim=1)
-
-                                                             
-        
                    
-        if self.has_moe:
-                                                     
+        if self.has_moe:                                       
             output = torch.zeros_like(noisy_latents)
-            
             t_threshold = 900.0
             high_noise_mask = timestep >= t_threshold
             low_noise_mask = timestep < t_threshold
-            if high_noise_mask.any():
-                                       
+            if high_noise_mask.any():                      
                 res_high = self.transformer(
                     hidden_states=latent_model_input[high_noise_mask],
                     timestep=timestep[high_noise_mask],
                     encoder_hidden_states=prompt_embeds[high_noise_mask],
                     return_dict=False
-                )[0]
-                
-                                              
+                )[0]                              
                 output[high_noise_mask] = res_high.to(output.dtype)
-                
-                                         
-            if low_noise_mask.any():
-                                       
+
+            if low_noise_mask.any():                   
                 res_low = self.transformer_2(
                     hidden_states=latent_model_input[low_noise_mask],
                     timestep=timestep[low_noise_mask],
                     encoder_hidden_states=prompt_embeds[low_noise_mask],
                     return_dict=False
-                )[0]
-                
-                                              
+                )[0]                           
                 output[low_noise_mask] = res_low.to(output.dtype)
-            
             return output
-        else:
-                                              
+        else:                                
             return self.transformer(
                 hidden_states=latent_model_input,
                 timestep=timestep,
@@ -333,109 +306,74 @@ class VideoRestorationSystem(nn.Module):
         return required_model
 
     def restore(
-            self,
-            video_input: torch.Tensor,
-            prompt: str,
-            denoise_strength: float = 1.0,                      
-            frames: int = 81,
-            sampling_steps: int = 40,
-            guidance_scale: float = 5.0,
-            seed: int = 42
-        ):
-            """
-            Main restoration loop with proper Denoising Strength support.
-            """
-            device = self.device 
-            dtype = self.dtype
-            
-            generator = torch.Generator(device=device).manual_seed(seed)
-            batch_size = 1
-            
-                                             
-                                                     
-                                                     
-            visual_latents = self.encode_video(video_input.to(device, dtype=dtype))
-            
-                                  
-            B, C, F_lat, H_lat, W_lat = visual_latents.shape
-            mask = torch.ones((B, 4, F_lat, H_lat, W_lat), device=device, dtype=dtype)
+        self,
+        video_input: torch.Tensor,
+        prompt: str,
+        denoise_strength: float = 1.0,
+        frames: int = 81,
+        sampling_steps: int = 40,
+        guidance_scale: float = 5.0,
+        seed: int = 42,
+    ):
+        """
+        Main restoration loop with proper Denoising Strength support.
+        """
+        device = self.device
+        dtype = self.dtype
+        generator = torch.Generator(device=device).manual_seed(seed)
+        batch_size = 1
+        visual_latents = self.encode_video(video_input.to(device, dtype=dtype))
+        B, C, F_lat, H_lat, W_lat = visual_latents.shape
+        mask = torch.ones((B, 4, F_lat, H_lat, W_lat), device=device, dtype=dtype)
+        condition_latents = torch.cat([mask, visual_latents], dim=1)
 
-                                                                                         
-        
-                                        
-                                    
-                                       
-            
-            condition_latents = torch.cat([ mask,visual_latents], dim=1) 
-            
-                                           
-            self.scheduler.set_timesteps(sampling_steps, device=device)
-            timesteps = self.scheduler.timesteps
-            
-                                           
-            num_inference_steps = len(timesteps)
-            
-                                            
-            denoise_strength = min(max(denoise_strength, 0.0), 1.0)
-            
-                        
-                                                    
-                                                          
-            init_timestep_idx = min(int(num_inference_steps * (1 - denoise_strength)), num_inference_steps - 1)
-            
-                         
-            t_start = timesteps[init_timestep_idx]
-            timesteps = timesteps[init_timestep_idx:]
-            
-            
-                                                  
-                                                                     
-                     
-            noise = torch.randn(
-                (batch_size, 16, F_lat, H_lat, W_lat), 
-                device=device, 
-                dtype=dtype,
-                generator=generator
-            )
-            
-            if denoise_strength >= 1.0:
-                                       
-                latents = noise
-            else:
-                                                            
-                                                               
-                sigma = t_start.item() / 1000.0
-                latents = (1 - sigma) * visual_latents + sigma * noise
+        self.scheduler.set_timesteps(sampling_steps, device=device)
+        timesteps = self.scheduler.timesteps
+        num_inference_steps = len(timesteps)
+        denoise_strength = min(max(denoise_strength, 0.0), 1.0)
+        init_timestep_idx = min(int(num_inference_steps * (1 - denoise_strength)), num_inference_steps - 1)
 
-                            
-            prompt_embeds = self.encode_text(prompt)
-            
-            autocast_ctx = torch.autocast("cuda", dtype=dtype) if device.type == "cuda" else nullcontext()
-            with torch.inference_mode(), autocast_ctx:
-                for t in timesteps:
-                    model = self._prepare_model_for_timestep(t)
-                    
-                    latent_model_input = torch.cat([latents, condition_latents], dim=1)
-                    
-                    t_batch = t.expand(latent_model_input.shape[0])
+        t_start = timesteps[init_timestep_idx]
+        timesteps = timesteps[init_timestep_idx:]
 
-                    noise_pred = model(
-                        hidden_states=latent_model_input,
-                        timestep=t_batch,
-                        encoder_hidden_states=prompt_embeds,
-                        return_dict=False
-                    )[0]
-                    
-                    if self.offload_model and device.type == "cuda":
-                        torch.cuda.empty_cache()
-                    
-                    latents = self.scheduler.step(noise_pred, t, latents).prev_sample
+        noise = torch.randn(
+            (batch_size, 16, F_lat, H_lat, W_lat),
+            device=device,
+            dtype=dtype,
+            generator=generator,
+        )
 
-            restored_video = self.decode_latents(latents)
-            if self.offload_model and device.type == "cuda":
-                if self.transformer.device.type == "cuda":
-                    self.transformer.to("cpu")
-                if self.has_moe and self.transformer_2 is not None and self.transformer_2.device.type == "cuda":
-                    self.transformer_2.to("cpu")
-                torch.cuda.empty_cache()
-            return restored_video
+        if denoise_strength >= 1.0:
+            latents = noise
+        else:
+            sigma = t_start.item() / 1000.0
+            latents = (1 - sigma) * visual_latents + sigma * noise
+
+        prompt_embeds = self.encode_text(prompt)
+        autocast_ctx = torch.autocast("cuda", dtype=dtype) if device.type == "cuda" else nullcontext()
+        with torch.inference_mode(), autocast_ctx:
+            for t in timesteps:
+                model = self._prepare_model_for_timestep(t)
+                latent_model_input = torch.cat([latents, condition_latents], dim=1)
+                t_batch = t.expand(latent_model_input.shape[0])
+
+                noise_pred = model(
+                    hidden_states=latent_model_input,
+                    timestep=t_batch,
+                    encoder_hidden_states=prompt_embeds,
+                    return_dict=False,
+                )[0]
+
+                if self.offload_model and device.type == "cuda":
+                    torch.cuda.empty_cache()
+
+                latents = self.scheduler.step(noise_pred, t, latents).prev_sample
+
+        restored_video = self.decode_latents(latents)
+        if self.offload_model and device.type == "cuda":
+            if self.transformer.device.type == "cuda":
+                self.transformer.to("cpu")
+            if self.has_moe and self.transformer_2 is not None and self.transformer_2.device.type == "cuda":
+                self.transformer_2.to("cpu")
+            torch.cuda.empty_cache()
+        return restored_video

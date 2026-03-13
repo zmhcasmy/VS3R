@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 import imageio.v2 as imageio
 import numpy as np
-from peft import PeftModel 
+from peft import PeftModel
 import traceback
 from tqdm import tqdm
 from model.VideoRestorationModel import VideoRestorationSystem
@@ -82,9 +82,17 @@ def get_blending_weights(window_size, overlap):
     return weights
 
                                                 
-def process_long_video_sliding_window(model, video_tensor, prompt, denoise, 
-                                      window_size=81, overlap=21, sampling_steps=40,
-                                      debug_folder=None, fps=24):
+def process_long_video_sliding_window(
+    model,
+    video_tensor,
+    prompt,
+    denoise,
+    window_size=81,
+    overlap=21,
+    sampling_steps=40,
+    debug_folder=None,
+    fps=24,
+):
     C, TotalFrames, H, W = video_tensor.shape
     device = model.device
     
@@ -121,15 +129,10 @@ def process_long_video_sliding_window(model, video_tensor, prompt, denoise,
         
         restored_chunk = restored_chunk.cpu().squeeze(0)
 
-                                                                  
-                                           
-                                                                  
         if debug_folder:
             chunk_name = f"chunk_{start_idx:04d}_{end_idx:04d}.mp4"
             chunk_path = os.path.join(debug_folder, chunk_name)
-                                                                  
             save_video(restored_chunk, chunk_path, fps=fps)
-                                                                  
 
         weights = get_blending_weights(current_len, overlap)
         
@@ -163,17 +166,11 @@ def run_vae_sanity_check(model, video_tensor):
     return recon_video
 
 def process_single_file(video_path, output_root, args):
-                                      
     video_name = os.path.basename(video_path)
     name_no_ext = os.path.splitext(video_name)[0]
-    
-                 
     out_video_path = os.path.join(output_root, f"{name_no_ext}.mp4")
-    
-                             
     os.makedirs(os.path.dirname(out_video_path), exist_ok=True)
 
-                                                
     if os.path.exists(out_video_path):
         print(f"⏭️  Skipping existing file: {out_video_path}")
         return

@@ -1099,7 +1099,7 @@ def main():
     parser.add_argument("--video_path", type=str, required=True, help="Path to input video file")
     parser.add_argument("--output_root", type=str, required=True, help="Root folder for outputs")
     parser.add_argument("--frame_stride", type=int, default=1)
-    parser.add_argument("--max_frames", type=int, default=500)
+    parser.add_argument("--max_frames", type=int, default=1000)
     parser.add_argument("--window_size", type=int, default=1, help="Frame window for static points")
     parser.add_argument("--radius", type=float, default=0.012)
     parser.add_argument("--points_per_pixel", type=int, default=12)
